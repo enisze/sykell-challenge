@@ -1,0 +1,43 @@
+# Root .gitignore for sykell-challenge project
+
+# Server binaries
+server/server
+server/cmd/server/server
+
+# Environment files
+server/.env
+server/.env.local
+client/.env
+client/.env.local
+
+# Dependencies
+server/vendor/
+client/node_modules/
+
+# Build outputs
+client/dist/
+client/build/
+
+# Logs
+*.log
+server/logs/
+client/logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
