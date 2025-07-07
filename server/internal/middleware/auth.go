@@ -20,8 +20,8 @@ func APIKeyMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		//Not needed, but configer proper API key here
-		validAPIKey := getEnv("API_KEY", "your-api-key-here")
+		//Not needed, but configure proper API key here
+		validAPIKey := getEnv("API_KEY", "your-secret-api-key")
 		if apiKey != validAPIKey {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key"})
 			c.Abort()
