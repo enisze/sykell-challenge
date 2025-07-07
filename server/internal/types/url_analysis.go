@@ -6,6 +6,7 @@ type BaseURLAnalysisData struct {
 	PageTitle     string `json:"pageTitle"`
 	InternalLinks int    `json:"internalLinks"`
 	ExternalLinks int    `json:"externalLinks"`
+	BrokenLinks   int    `json:"brokenLinks"`
 	HasLoginForm  bool   `json:"hasLoginForm"`
 	Error         string `json:"error,omitempty"`
 }

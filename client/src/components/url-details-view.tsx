@@ -257,15 +257,43 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
         </CardHeader>
         <CardContent>
           {urlEntry.brokenLinks > 0 ? (
-            <div className="text-center py-8">
-              <X className="h-12 w-12 text-red-600 mx-auto mb-4" />
-              <p className="text-lg font-medium text-red-600">
-                {urlEntry.brokenLinks} Broken Link{urlEntry.brokenLinks > 1 ? 's' : ''} Detected
-              </p>
-              <p className="text-muted-foreground mt-2">
-                The analysis found {urlEntry.brokenLinks} non-functional link{urlEntry.brokenLinks > 1 ? 's' : ''} on this page.
-                These links may return 404, 500, or other error status codes.
-              </p>
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <X className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                <p className="text-lg font-medium text-red-600">
+                  {urlEntry.brokenLinks} Broken Link{urlEntry.brokenLinks > 1 ? 's' : ''} Detected
+                </p>
+                <p className="text-muted-foreground mt-2">
+                  The analysis found {urlEntry.brokenLinks} non-functional link{urlEntry.brokenLinks > 1 ? 's' : ''} on this page.
+                </p>
+              </div>
+              
+              {urlEntry.brokenLinkDetails && urlEntry.brokenLinkDetails.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-muted-foreground">Broken Link Details:</h4>
+                  <div className="space-y-2">
+                    {urlEntry.brokenLinkDetails.map((brokenLink, index) => (
+                      <div key={index} className="border rounded-lg p-3 bg-red-50">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-red-900 truncate">
+                              {brokenLink.url}
+                            </p>
+                            {brokenLink.error && (
+                              <p className="text-xs text-red-600 mt-1">
+                                {brokenLink.error}
+                              </p>
+                            )}
+                          </div>
+                          <Badge variant="destructive" className="shrink-0">
+                            {brokenLink.statusCode}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8">

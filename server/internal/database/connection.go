@@ -41,7 +41,7 @@ func Connect() error {
 		return fmt.Errorf("failed to connect to database: %v", err)
 	}
 
-	err = DB.AutoMigrate(&models.URLAnalysis{}, &models.HeadingCount{})
+	err = DB.AutoMigrate(&models.URLAnalysis{}, &models.HeadingCount{}, &models.BrokenLink{})
 	if err != nil {
 		return fmt.Errorf("failed to migrate database: %v", err)
 	}

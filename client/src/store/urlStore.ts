@@ -7,24 +7,65 @@ export const urlsAtom = atomWithStorage<URLEntry[]>('urls', [])
 
 export const isLoadingAtom = atom(false)
 
-export const addUrlAtom = atom(
+
+export const addOrUpdateUrlAtom = atom(
   null,
-  (get, set, newUrl: URLEntry) => {
+  (get, set, input: string | URLEntry): URLEntry => {
     const currentUrls = get(urlsAtom)
-    set(urlsAtom, [newUrl, ...currentUrls])
+    
+    if (typeof input === 'string') {
+      const existingUrl = currentUrls.find(url => url.url === input)
+      
+      if (existingUrl) {
+        const updatedUrl = {
+          ...existingUrl,
+          status: "queued" as URLStatus,
+          lastUpdated: new Date(),
+        }
+        const updatedUrls = currentUrls.map(url => 
+          url.id === existingUrl.id ? updatedUrl : url
+        )
+        set(urlsAtom, updatedUrls)
+        return updatedUrl
+      } else {
+        const id = generateId()
+        const newUrl: URLEntry = {
+          id,
+          url: input,
+          title: "Analyzing...",
+          htmlVersion: "Unknown",
+          internalLinks: 0,
+          externalLinks: 0,
+          brokenLinks: 0,
+          hasLoginForm: false,
+          headingCounts: {},
+          brokenLinkDetails: [],
+          status: "queued" as URLStatus,
+          lastUpdated: new Date(),
+        }
+        set(urlsAtom, [newUrl, ...currentUrls])
+        return newUrl
+      }
+    } else {
+      const existingUrl = currentUrls.find(url => url.url === input.url)
+      
+      if (existingUrl) {
+        // Update existing URL entry
+        const updatedUrl = { ...input, id: existingUrl.id }
+        const updatedUrls = currentUrls.map(url => 
+          url.id === existingUrl.id ? updatedUrl : url
+        )
+        set(urlsAtom, updatedUrls)
+        return updatedUrl
+      } else {
+        // Add new URL entry
+        set(urlsAtom, [input, ...currentUrls])
+        return input
+      }
+    }
   }
 )
 
-export const updateUrlAtom = atom(
-  null,
-  (get, set, updatedUrl: URLEntry) => {
-    const currentUrls = get(urlsAtom)
-    const updatedUrls = currentUrls.map(url => 
-      url.id === updatedUrl.id ? updatedUrl : url
-    )
-    set(urlsAtom, updatedUrls)
-  }
-)
 
 export const deleteUrlsAtom = atom(
   null,

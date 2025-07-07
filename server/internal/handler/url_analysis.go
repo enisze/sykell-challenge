@@ -21,7 +21,8 @@ type URLAnalysisRequest struct {
 
 type URLAnalysisResponse struct {
 	types.BaseURLAnalysisData
-	HeadingCounts map[string]int `json:"headingCounts"`
+	HeadingCounts      map[string]int         `json:"headingCounts"`
+	BrokenLinkDetails  []models.BrokenLink    `json:"brokenLinkDetails"`
 }
 
 func AnalyzeURL(c *gin.Context) {
@@ -56,10 +57,24 @@ func analyzeURL(urlStr string) URLAnalysisResponse {
 			URL:         urlStr,
 			HTMLVersion: "HTML5",
 		},
-		HeadingCounts: make(map[string]int),
+		HeadingCounts:     make(map[string]int),
+		BrokenLinkDetails: make([]models.BrokenLink, 0),
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
+			IdleConnTimeout:       30 * time.Second,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
 	
 	body, err := fetchWebpage(client, urlStr)
 	if err != nil {
@@ -76,7 +91,7 @@ func analyzeURL(urlStr string) URLAnalysisResponse {
 	parsedURL, _ := url.Parse(urlStr)
 	baseHost := parsedURL.Host
 
-	analyzeHTML(doc, &result, baseHost)
+	analyzeHTML(doc, &result, baseHost, client)
 
 	return result
 }
@@ -100,7 +115,7 @@ func fetchWebpage(client *http.Client, urlStr string) (string, error) {
 	return string(body), nil
 }
 
-func analyzeHTML(n *html.Node, result *URLAnalysisResponse, baseHost string) {
+func analyzeHTML(n *html.Node, result *URLAnalysisResponse, baseHost string, client *http.Client) {
 	if n.Type == html.ElementNode {
 		switch strings.ToLower(n.Data) {
 		case "title":
@@ -110,7 +125,7 @@ func analyzeHTML(n *html.Node, result *URLAnalysisResponse, baseHost string) {
 		case "h1", "h2", "h3", "h4", "h5", "h6":
 			result.HeadingCounts[strings.ToUpper(n.Data)]++
 		case "a":
-			processLink(n, result, baseHost)
+			processLink(n, result, baseHost, client)
 		case "form":
 			if hasPasswordInput(n) {
 				result.HasLoginForm = true
@@ -123,7 +138,7 @@ func analyzeHTML(n *html.Node, result *URLAnalysisResponse, baseHost string) {
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		analyzeHTML(c, result, baseHost)
+		analyzeHTML(c, result, baseHost, client)
 	}
 }
 
@@ -136,7 +151,7 @@ func isInHeadElement(n *html.Node) bool {
 	return false
 }
 
-func processLink(n *html.Node, result *URLAnalysisResponse, baseHost string) {
+func processLink(n *html.Node, result *URLAnalysisResponse, baseHost string, client *http.Client) {
 	for _, attr := range n.Attr {
 		if attr.Key == "href" {
 			href := attr.Val
@@ -151,13 +166,67 @@ func processLink(n *html.Node, result *URLAnalysisResponse, baseHost string) {
 				return
 			}
 
+			var fullURL string
+			if linkURL.IsAbs() {
+				fullURL = href
+			} else {
+				baseURL := &url.URL{Scheme: "http", Host: baseHost}
+				fullURL = baseURL.ResolveReference(linkURL).String()
+			}
+
 			if linkURL.Host == "" || linkURL.Host == baseHost {
 				result.InternalLinks++
 			} else {
 				result.ExternalLinks++
 			}
+
+			checkLinkStatus(fullURL, result, client)
 			break
 		}
+	}
+}
+
+func checkLinkStatus(linkURL string, result *URLAnalysisResponse, client *http.Client) {
+	addBrokenLink := func(statusCode int, errMsg string) {
+		result.BrokenLinkDetails = append(result.BrokenLinkDetails, models.BrokenLink{
+			URL:        linkURL,
+			StatusCode: statusCode,
+			Error:      errMsg,
+		})
+		result.BaseURLAnalysisData.BrokenLinks++
+	}
+
+	req, err := http.NewRequest("HEAD", linkURL, nil)
+	if err != nil {
+		addBrokenLink(0, fmt.Sprintf("Failed to create request: %v", err))
+		return
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; URL-Analyzer/1.0)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		// If HEAD fails, try GET request
+		getReq, getErr := http.NewRequest("GET", linkURL, nil)
+		if getErr != nil {
+			addBrokenLink(0, fmt.Sprintf("Request failed: %v", getErr))
+			return
+		}
+
+		getReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; URL-Analyzer/1.0)")
+		getResp, getErr := client.Do(getReq)
+		if getErr != nil {
+			addBrokenLink(0, fmt.Sprintf("Request failed: %v", getErr))
+			return
+		}
+		defer getResp.Body.Close()
+		resp = getResp
+	} else {
+		defer resp.Body.Close()
+	}
+
+	if resp.StatusCode >= 400 {
+		addBrokenLink(resp.StatusCode, fmt.Sprintf("HTTP error: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode)))
 	}
 }
 
@@ -191,6 +260,7 @@ func parseHTMLVersion(doctype string) string {
 func convertToDBModel(response URLAnalysisResponse) *models.URLAnalysis {
 	analysis := &models.URLAnalysis{
 		BaseURLAnalysisData: response.BaseURLAnalysisData,
+		BrokenLinks:         response.BrokenLinkDetails,
 	}
 
 	for level, count := range response.HeadingCounts {
@@ -206,7 +276,8 @@ func convertToDBModel(response URLAnalysisResponse) *models.URLAnalysis {
 func convertFromDBModel(analysis *models.URLAnalysis) URLAnalysisResponse {
 	response := URLAnalysisResponse{
 		BaseURLAnalysisData: analysis.BaseURLAnalysisData,
-		HeadingCounts: make(map[string]int),
+		HeadingCounts:       make(map[string]int),
+		BrokenLinkDetails:   analysis.BrokenLinks,
 	}
 
 	for _, hc := range analysis.HeadingCounts {

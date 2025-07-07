@@ -23,6 +23,7 @@ func (s *URLAnalysisService) SaveAnalysis(analysis *models.URLAnalysis) error {
 func (s *URLAnalysisService) GetAnalysisByURL(url string) (*models.URLAnalysis, error) {
 	var analysis models.URLAnalysis
 	err := s.db.Preload("HeadingCounts").
+		Preload("BrokenLinks").
 		Where("url = ?", url).
 		Order("created_at DESC").
 		First(&analysis).Error

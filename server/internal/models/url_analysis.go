@@ -17,6 +17,7 @@ type URLAnalysis struct {
 	types.BaseURLAnalysisData
 
 	HeadingCounts []HeadingCount `gorm:"foreignKey:URLAnalysisID;constraint:OnDelete:CASCADE" json:"headingCounts"`
+	BrokenLinks   []BrokenLink   `gorm:"foreignKey:URLAnalysisID;constraint:OnDelete:CASCADE" json:"brokenLinks"`
 }
 
 type HeadingCount struct {
@@ -26,10 +27,22 @@ type HeadingCount struct {
 	Count         int    `gorm:"not null" json:"count"`
 }
 
+type BrokenLink struct {
+	BaseModel
+	URLAnalysisID uint   `gorm:"not null;index" json:"urlAnalysisId"`
+	URL           string `gorm:"not null" json:"url"`
+	StatusCode    int    `json:"statusCode"`
+	Error         string `json:"error,omitempty"`
+}
+
 func (URLAnalysis) TableName() string {
 	return "url_analyses"
 }
 
 func (HeadingCount) TableName() string {
 	return "heading_counts"
+}
+
+func (BrokenLink) TableName() string {
+	return "broken_links"
 }
