@@ -15,6 +15,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import {
+  ChevronDown,
+  ChevronUp,
   Search
 } from "lucide-react"
 import { useState } from "react"
@@ -102,7 +104,6 @@ export function URLTable({ data, isLoading }: URLTableProps) {
         </Select>
       </div>
 
-      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -111,12 +112,39 @@ export function URLTable({ data, isLoading }: URLTableProps) {
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={
+                            header.column.getCanSort()
+                              ? 'cursor-pointer select-none font-semibold flex items-center'
+                              : 'font-semibold'
+                          }
+                          onClick={header.column.getToggleSortingHandler()}
+                          title={
+                            header.column.getCanSort()
+                              ? header.column.getNextSortingOrder() === 'asc'
+                                ? 'Sort ascending'
+                                : header.column.getNextSortingOrder() === 'desc'
+                                  ? 'Sort descending'
+                                  : 'Clear sort'
+                              : undefined
+                          }
+                        >
+                          {flexRender(
                             header.column.columnDef.header,
                             header.getContext()
                           )}
+                          {header.column.getCanSort() && (
+                            <>
+                              {header.column.getIsSorted() === "asc" ? (
+                                <ChevronUp className="ml-1 h-4 w-4" />
+                              ) : header.column.getIsSorted() === "desc" ? (
+                                <ChevronDown className="ml-1 h-4 w-4" />
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </TableHead>
                   )
                 })}
@@ -154,7 +182,6 @@ export function URLTable({ data, isLoading }: URLTableProps) {
         </Table>
       </div>
 
-      {/* Pagination */}
       <DataTablePagination table={table} />
     </div>
   )

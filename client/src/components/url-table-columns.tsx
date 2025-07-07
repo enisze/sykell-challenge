@@ -1,8 +1,6 @@
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import type { URLEntry, URLStatus } from "@/types/url-analysis"
 import type { ColumnDef } from "@tanstack/react-table"
-import { ChevronDown, ChevronUp } from "lucide-react"
 
 function getStatusVariant(status: URLStatus) {
   switch (status) {
@@ -24,22 +22,7 @@ function getStatusVariant(status: URLStatus) {
 export const urlTableColumns: ColumnDef<URLEntry>[] = [
   {
     accessorKey: "url",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold"
-        >
-          URL
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "URL",
     cell: ({ row }) => (
       <div className="max-w-xs truncate">
         <a
@@ -55,42 +38,12 @@ export const urlTableColumns: ColumnDef<URLEntry>[] = [
   },
   {
     accessorKey: "title",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold"
-        >
-          Title
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "Title",
     cell: ({ row }) => <div className="max-w-xs truncate">{row.getValue("title")}</div>,
   },
   {
     accessorKey: "status",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold"
-        >
-          Status
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "Status",
     cell: ({ row }) => {
       const status = row.getValue("status") as URLStatus
       const crawlProgress = row.original.crawlProgress
@@ -109,102 +62,27 @@ export const urlTableColumns: ColumnDef<URLEntry>[] = [
   },
   {
     accessorKey: "htmlVersion",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold"
-        >
-          HTML Version
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "HTML Version",
     cell: ({ row }) => <div>{row.getValue("htmlVersion")}</div>,
   },
   {
     accessorKey: "internalLinks",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-right justify-end"
-        >
-          Internal Links
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "Internal Links",
     cell: ({ row }) => <div className="text-right">{row.getValue("internalLinks")}</div>,
   },
   {
     accessorKey: "externalLinks",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-right justify-end"
-        >
-          External Links
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "External Links",
     cell: ({ row }) => <div className="text-right">{row.getValue("externalLinks")}</div>,
   },
   {
     accessorKey: "brokenLinks",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-right justify-end"
-        >
-          Broken Links
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "Broken Links",
     cell: ({ row }) => <div className="text-right">{row.getValue("brokenLinks")}</div>,
   },
   {
     accessorKey: "lastUpdated",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold"
-        >
-          Last Updated
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-1 h-4 w-4" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-1 h-4 w-4" />
-          ) : null}
-        </Button>
-      )
-    },
+    header: "Last Updated",
     cell: ({ row }) => {
       const dateValue = row.getValue("lastUpdated")
       
