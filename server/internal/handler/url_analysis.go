@@ -16,7 +16,7 @@ import (
 )
 
 type URLAnalysisRequest struct {
-	URLs []string `json:"urls" binding:"required"`
+	URL string `json:"url" binding:"required"`
 }
 
 type URLAnalysisResponse struct {
@@ -24,11 +24,7 @@ type URLAnalysisResponse struct {
 	HeadingCounts map[string]int `json:"headingCounts"`
 }
 
-type URLAnalysisResults struct {
-	Results []URLAnalysisResponse `json:"results"`
-}
-
-func AnalyzeURLs(c *gin.Context) {
+func AnalyzeURL(c *gin.Context) {
 	var req URLAnalysisRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -36,26 +32,22 @@ func AnalyzeURLs(c *gin.Context) {
 	}
 
 	urlService := services.NewURLAnalysisService()
-	var results []URLAnalysisResponse
 	
-	for _, urlStr := range req.URLs {
-		existingAnalysis, err := urlService.GetAnalysisByURL(urlStr)
-		if err == nil && existingAnalysis != nil {
-			result := convertFromDBModel(existingAnalysis)
-			results = append(results, result)
-			continue
-		}
-		
-		result := analyzeURL(urlStr)
-		results = append(results, result)
-		
-		if result.Error == "" {
-			dbAnalysis := convertToDBModel(result)
-			urlService.SaveAnalysis(dbAnalysis)
-		}
+	existingAnalysis, err := urlService.GetAnalysisByURL(req.URL)
+	if err == nil && existingAnalysis != nil {
+		result := convertFromDBModel(existingAnalysis)
+		c.JSON(http.StatusOK, result)
+		return
+	}
+	
+	result := analyzeURL(req.URL)
+	
+	if result.Error == "" {
+		dbAnalysis := convertToDBModel(result)
+		urlService.SaveAnalysis(dbAnalysis)
 	}
 
-	c.JSON(http.StatusOK, URLAnalysisResults{Results: results})
+	c.JSON(http.StatusOK, result)
 }
 
 func analyzeURL(urlStr string) URLAnalysisResponse {
@@ -112,7 +104,7 @@ func analyzeHTML(n *html.Node, result *URLAnalysisResponse, baseHost string) {
 	if n.Type == html.ElementNode {
 		switch strings.ToLower(n.Data) {
 		case "title":
-			if n.FirstChild != nil && n.FirstChild.Type == html.TextNode {
+			if isInHeadElement(n) && n.FirstChild != nil && n.FirstChild.Type == html.TextNode {
 				result.PageTitle = strings.TrimSpace(n.FirstChild.Data)
 			}
 		case "h1", "h2", "h3", "h4", "h5", "h6":
@@ -133,6 +125,15 @@ func analyzeHTML(n *html.Node, result *URLAnalysisResponse, baseHost string) {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		analyzeHTML(c, result, baseHost)
 	}
+}
+
+func isInHeadElement(n *html.Node) bool {
+	for parent := n.Parent; parent != nil; parent = parent.Parent {
+		if parent.Type == html.ElementNode && strings.ToLower(parent.Data) == "head" {
+			return true
+		}
+	}
+	return false
 }
 
 func processLink(n *html.Node, result *URLAnalysisResponse, baseHost string) {

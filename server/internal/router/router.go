@@ -32,7 +32,7 @@ func SetupRouter() *gin.Engine {
 	api := r.Group("/api")
 	api.Use(middleware.APIKeyMiddleware())
 	{
-		api.POST("/analyze-urls", handler.AnalyzeURLs)
+		api.POST("/analyze-url", handler.AnalyzeURL)
 	}
 	
 	return r
