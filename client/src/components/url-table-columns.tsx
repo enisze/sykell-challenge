@@ -44,6 +44,9 @@ export const urlTableColumns: ColumnDef<URLEntry>[] = [
   {
     accessorKey: "status",
     header: "Status",
+    meta: {
+      filterVariant: 'select',
+    },
     cell: ({ row }) => {
       const status = row.getValue("status") as URLStatus
       const crawlProgress = row.original.crawlProgress
@@ -68,16 +71,25 @@ export const urlTableColumns: ColumnDef<URLEntry>[] = [
   {
     accessorKey: "internalLinks",
     header: "Internal Links",
+    meta: {
+      filterVariant: 'range',
+    },
     cell: ({ row }) => <div className="text-right">{row.getValue("internalLinks")}</div>,
   },
   {
     accessorKey: "externalLinks",
     header: "External Links",
+    meta: {
+      filterVariant: 'range',
+    },
     cell: ({ row }) => <div className="text-right">{row.getValue("externalLinks")}</div>,
   },
   {
     accessorKey: "brokenLinks",
     header: "Broken Links",
+    meta: {
+      filterVariant: 'range',
+    },
     cell: ({ row }) => <div className="text-right">{row.getValue("brokenLinks")}</div>,
   },
   {

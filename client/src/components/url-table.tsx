@@ -4,23 +4,116 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { urlTableColumns } from "@/components/url-table-columns"
 import type { URLEntry } from "@/types/url-analysis"
 import {
+  type Column,
   type ColumnFiltersState,
-  type SortingState,
-  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table"
+import { useDebounce } from "@uidotdev/usehooks"
 import {
   ChevronDown,
   ChevronUp,
   Search
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { DataTablePagination } from "./data-table-pagination"
+
+type FilterVariant = 'text' | 'select' | 'range'
+
+interface ColumnMeta {
+  filterVariant?: FilterVariant
+}
+
+type RangeFilter = [number | undefined, number | undefined]
+
+// Filter component for each column
+function Filter({ column }: { column: Column<URLEntry, unknown> }) {
+  const columnFilterValue = column.getFilterValue()
+  const filterVariant = (column.columnDef.meta as ColumnMeta)?.filterVariant ?? 'text'
+  
+  // For text filters
+  const [searchValue, setSearchValue] = useState(
+    filterVariant === 'text' ? (columnFilterValue as string) ?? '' : ''
+  )
+  const debouncedSearchValue = useDebounce(searchValue, 500)
+  
+  const rangeValue = filterVariant === 'range' ? (columnFilterValue as RangeFilter) : undefined
+  const [minValue, setMinValue] = useState(rangeValue?.[0]?.toString() ?? '')
+  const [maxValue, setMaxValue] = useState(rangeValue?.[1]?.toString() ?? '')
+  const debouncedMinValue = useDebounce(minValue, 500)
+  const debouncedMaxValue = useDebounce(maxValue, 500)
+
+  // Update column filter when debounced values change
+  useEffect(() => {
+    if (filterVariant === 'text') {
+      column.setFilterValue(debouncedSearchValue || undefined)
+    }
+  }, [debouncedSearchValue, column, filterVariant])
+
+  useEffect(() => {
+    if (filterVariant === 'range') {
+      const min = debouncedMinValue === '' ? undefined : Number(debouncedMinValue)
+      const max = debouncedMaxValue === '' ? undefined : Number(debouncedMaxValue)
+      if (min !== undefined || max !== undefined) {
+        column.setFilterValue([min, max])
+      } else {
+        column.setFilterValue(undefined)
+      }
+    }
+  }, [debouncedMinValue, debouncedMaxValue, column, filterVariant])
+
+  return filterVariant === 'range' ? (
+    <div>
+      <div className="flex space-x-2">
+        <Input
+          type="number"
+          value={minValue}
+          onChange={(e) => setMinValue(e.target.value)}
+          placeholder="Min"
+          className="w-24 text-sm"
+        />
+        <Input
+          type="number"
+          value={maxValue}
+          onChange={(e) => setMaxValue(e.target.value)}
+          placeholder="Max"
+          className="w-24 text-sm"
+        />
+      </div>
+    </div>
+  ) : filterVariant === 'select' ? (
+    <Select
+      value={columnFilterValue?.toString() ?? "all"}
+      onValueChange={(value) => column.setFilterValue(value === "all" ? undefined : value)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="All" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All</SelectItem>
+        <SelectItem value="done">Done</SelectItem>
+        <SelectItem value="running">Running</SelectItem>
+        <SelectItem value="queued">Queued</SelectItem>
+        <SelectItem value="error">Error</SelectItem>
+        <SelectItem value="stopped">Stopped</SelectItem>
+      </SelectContent>
+    </Select>
+  ) : (
+    <Input
+      className="w-full text-sm"
+      onChange={(e) => setSearchValue(e.target.value)}
+      placeholder="Search..."
+      type="text"
+      value={searchValue}
+    />
+  )
+}
 
 interface URLTableProps {
   data: URLEntry[]
@@ -148,6 +241,17 @@ export function URLTable({ data, isLoading }: URLTableProps) {
                     </TableHead>
                   )
                 })}
+              </TableRow>
+            ))}
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={`${headerGroup.id}-filters`}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={`${header.id}-filter`} className="p-2">
+                    {header.column.getCanFilter() ? (
+                      <Filter column={header.column} />
+                    ) : null}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
