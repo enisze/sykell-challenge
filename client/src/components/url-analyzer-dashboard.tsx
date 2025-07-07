@@ -6,16 +6,16 @@ export default function URLAnalyzerDashboard() {
   const { data: urls = [], isLoading } = useUrls()
 
   return (
-      <Card>
-        <CardHeader>
-          <CardTitle>URL Analysis Dashboard</CardTitle>
-          <CardDescription>
-            View and analyze URL data with sorting, filtering, and pagination
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <URLTable data={urls} isLoading={isLoading} />
-        </CardContent>
-      </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>URL Analysis Dashboard</CardTitle>
+        <CardDescription>
+          View and analyze URL data with sorting, filtering, and pagination
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <URLTable data={urls} isLoading={isLoading} />
+      </CardContent>
+    </Card>
   )
 }

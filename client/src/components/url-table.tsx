@@ -7,6 +7,7 @@ import { urlTableColumns } from "@/components/url-table-columns"
 import { useUrlQueue } from "@/hooks/useUrlQueue"
 import { deleteUrlsAtom, rerunUrlsWithQueueAtom } from "@/store/urlStore"
 import type { URLEntry } from "@/types/url-analysis"
+import { useNavigate } from "@tanstack/react-router"
 import {
   type Column,
   type ColumnFiltersState,
@@ -129,6 +130,7 @@ interface URLTableProps {
 }
 
 export function URLTable({ data, isLoading }: URLTableProps) {
+  const navigate = useNavigate()
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: "lastUpdated",
@@ -344,6 +346,8 @@ export function URLTable({ data, isLoading }: URLTableProps) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate({ to: '/details/$id', params: { id: row.original.id } })}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

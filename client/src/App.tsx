@@ -1,18 +1,15 @@
-import { Toaster } from "sonner"
-import { QueueStatusComponent } from "./components/queue-status"
-import URLAnalyzerDashboard from "./components/url-analyzer-dashboard"
-import { URLInputForm } from "./components/url-input-form"
-import "./index.css"
+import { createRouter, RouterProvider } from '@tanstack/react-router'
 
-function App() {
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <URLInputForm />
-      <URLAnalyzerDashboard/>
-      <QueueStatusComponent />
-      <Toaster />
-    </div>
-  )
+import { routeTree } from './routeTree.gen'
+
+const router = createRouter({ routeTree })
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
 }
 
-export default App
+export default function App() {
+  return <RouterProvider router={router} />
+}

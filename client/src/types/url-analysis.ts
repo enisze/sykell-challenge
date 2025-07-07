@@ -9,7 +9,7 @@ export interface URLEntry {
   externalLinks: number
   brokenLinks: number
   status: URLStatus
-  lastUpdated: Date
+  lastUpdated: Date | string
   processingTime?: number
   crawlProgress?: number
   errorMessage?: string
