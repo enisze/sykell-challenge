@@ -1,166 +1,179 @@
-import { addOrUpdateUrlAtom } from '@/store/urlStore'
-import type { URLEntry, URLStatus } from '@/types/url-analysis'
-import { atom, useAtom } from 'jotai'
-import { useCallback, useEffect, useRef } from 'react'
+import { analyzeUrl } from '@/lib/api'
+import { processUrlAtom } from '@/store/urlStore'
+import type { URLEntry } from '@/types/url-analysis'
+import { atom, useAtom, useSetAtom } from 'jotai'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 export const queueAtom = atom<string[]>([])
 export const isProcessingAtom = atom(false)
 export const currentProcessingUrlAtom = atom<string | null>(null)
-export const queueStatusOpenAtom = atom(false)
 export const currentBatchUrlsAtom = atom<string[]>([])
 export const currentBatchCompletedAtom = atom<URLEntry[]>([])
 
+export const queueProgressAtom = atom((get) => {
+  const currentBatchUrls = get(currentBatchUrlsAtom)
+  const currentBatchCompleted = get(currentBatchCompletedAtom)
+  
+  return currentBatchUrls.length > 0 ? (currentBatchCompleted.length / currentBatchUrls.length) * 100 : 0
+})
+
+// Constants
+const PROCESSING_DELAY = 1000 // Increased to 1 second for better rate limiting
+
+/**
+ * URL queue management hook with batch processing
+ * 
+ * @returns Queue management functions and status
+ */
 export function useUrlQueue() {
   const [queue, setQueue] = useAtom(queueAtom)
   const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom)
   const [currentProcessingUrl, setCurrentProcessingUrl] = useAtom(currentProcessingUrlAtom)
-  const [, setQueueStatusOpen] = useAtom(queueStatusOpenAtom)
   const [currentBatchUrls, setCurrentBatchUrls] = useAtom(currentBatchUrlsAtom)
   const [currentBatchCompleted, setCurrentBatchCompleted] = useAtom(currentBatchCompletedAtom)
-  const [, addOrUpdateUrl] = useAtom(addOrUpdateUrlAtom)
+  const processUrl = useSetAtom(processUrlAtom)
+  const queueProgress = useAtom(queueProgressAtom)[0]
   
-  const processingRef = useRef<boolean>(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const updateBatchCompleted = useCallback((url: string, entry: URLEntry) => {
+    if (!currentBatchUrls.includes(url)) return
+    
+    setCurrentBatchCompleted(prev => {
+      const existingIndex = prev.findIndex(e => e.url === url)
+      if (existingIndex >= 0) {
+        const newArray = [...prev]
+        newArray[existingIndex] = entry
+        return newArray
+      }
+      return [...prev, entry]
+    })
+  }, [currentBatchUrls, setCurrentBatchCompleted])
 
   const addToQueue = useCallback((urlsToAdd: string[]) => {
-    setQueue(prev => [...prev, ...urlsToAdd])
-    setCurrentBatchUrls(urlsToAdd) // Track current batch URLs
-    setCurrentBatchCompleted([]) // Reset completed for new batch
-    setQueueStatusOpen(true) // Auto-open the queue status
-  }, [setQueue, setCurrentBatchUrls, setCurrentBatchCompleted, setQueueStatusOpen])
+    const uniqueUrls = [...new Set(urlsToAdd)]
+    
+    setQueue(prev => {
+      const existingUrls = new Set(prev)
+      const newUrls = uniqueUrls.filter(url => !existingUrls.has(url))
+      return newUrls.length > 0 ? [...prev, ...newUrls] : prev
+    })
+    
+    setCurrentBatchUrls(uniqueUrls)
+    setCurrentBatchCompleted([])
+  }, [setQueue, setCurrentBatchUrls, setCurrentBatchCompleted])
 
-  const removeFromQueue = useCallback((urlToRemove: string) => {
-    setQueue(prev => prev.filter(url => url !== urlToRemove))
-    setCurrentBatchUrls(prev => prev.filter(url => url !== urlToRemove))
-  }, [setQueue, setCurrentBatchUrls])
-
-  const clearQueue = useCallback(() => {
-    setQueue([])
-  }, [setQueue])
-
-  const processUrl = useCallback(async (url: string) => {
-    // Step 1: Ensure URL exists in store with "queued" status
-    const urlEntry = addOrUpdateUrl(url)
+  const analyzeUrlWithProcessing = useCallback(async (url: string) => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     
     try {
-      // Step 2: Update to "running" status for UI feedback
-      addOrUpdateUrl({ ...urlEntry, status: "running" })
+      // Step 1: Create URL entry with "queued" status
+      processUrl({ url, status: "queued" })
       
-      const response = await fetch('http://localhost:8080/api/analyze-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': 'your-secret-api-key',
-        },
-        body: JSON.stringify({ url: url }),
-      })
+      // Step 2: Update to "running" status
+      processUrl({ url })
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-       const result = await response.json()
+      // Step 3: Make API request
+      const result = await analyzeUrl(url, controller.signal)
       
-      if (result.error) {
-        throw new Error(result.error)
-      }
-
-      // Step 3: Update with final success results
-      const completedEntry: URLEntry = {
-        ...urlEntry,
-        title: result.pageTitle || "Analysis Complete",
-        htmlVersion: result.htmlVersion || "HTML5",
-        internalLinks: result.internalLinks || 0,
-        externalLinks: result.externalLinks || 0,
-        brokenLinks: 0,
-        status: "done" as URLStatus,
-        lastUpdated: new Date(),
-        processingTime: 0,
-      }
-      
-      addOrUpdateUrl(completedEntry)
-      
-      if (currentBatchUrls.includes(url)) {
-        setCurrentBatchCompleted(prev => {
-          // Check if this URL is already in the completed list
-          const alreadyCompleted = prev.some(entry => entry.url === url)
-          if (alreadyCompleted) {
-            // Update existing entry instead of adding duplicate
-            return prev.map(entry => entry.url === url ? completedEntry : entry)
-          }
-          return [...prev, completedEntry]
-        })
-      }
+      // Step 4: Update to "done" status with results
+      const completedEntry = processUrl({ url, apiResult: result })
+      updateBatchCompleted(url, completedEntry)
       
     } catch (error) {
-      // Step 3: Update with error results
-      const errorEntry: URLEntry = {
-        ...urlEntry,
-        status: "error" as URLStatus,
-        lastUpdated: new Date(),
-        errorMessage: error instanceof Error ? error.message : "Unknown error occurred",
+      // Handle cancellation gracefully
+      if (error instanceof Error && error.name === 'AbortError') {
+        return
       }
       
-      addOrUpdateUrl(errorEntry)
-      
-      if (currentBatchUrls.includes(url)) {
-        setCurrentBatchCompleted(prev => {
-          // Check if this URL is already in the completed list
-          const alreadyCompleted = prev.some(entry => entry.url === url)
-          if (alreadyCompleted) {
-            // Update existing entry instead of adding duplicate
-            return prev.map(entry => entry.url === url ? errorEntry : entry)
-          }
-          return [...prev, errorEntry]
-        })
+      // Step 5: Update to "error" status
+      const errorEntry = processUrl({ 
+        url, 
+        error: error instanceof Error ? error.message : "Unknown error occurred" 
+      })
+      updateBatchCompleted(url, errorEntry)
+    } finally {
+      // Clean up abort controller
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null
       }
     }
-  }, [addOrUpdateUrl, currentBatchUrls, setCurrentBatchCompleted])
+  }, [processUrl, updateBatchCompleted])
 
-  const processQueue = useCallback(async () => {
-    if (processingRef.current || queue.length === 0) {
-      return
-    }
+  const processQueueItems = useCallback(async () => {
+    // Use isProcessing state instead of ref to prevent race conditions
+    if (isProcessing || queue.length === 0) return
 
-    processingRef.current = true
     setIsProcessing(true)
 
     try {
-      for (const url of queue) {
-        setCurrentProcessingUrl(url)
-        await processUrl(url)
+      const urlsToProcess = [...queue]
+      
+      for (const url of urlsToProcess) {
+        if (!isProcessing) break
         
+        setCurrentProcessingUrl(url)
+        await analyzeUrlWithProcessing(url)
         setQueue(prev => prev.filter(u => u !== url))
         
-        await new Promise(resolve => setTimeout(resolve, 500))
+        if (urlsToProcess.indexOf(url) < urlsToProcess.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, PROCESSING_DELAY))
+        }
       }
     } finally {
-      processingRef.current = false
       setIsProcessing(false)
       setCurrentProcessingUrl(null)
     }
-  }, [queue, processUrl, setIsProcessing, setCurrentProcessingUrl, setQueue])
+  }, [queue, isProcessing, analyzeUrlWithProcessing, setIsProcessing, setCurrentProcessingUrl, setQueue])
+
+  const cancelProcessing = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    setIsProcessing(false)
+    setCurrentProcessingUrl(null)
+    setQueue([])
+    setCurrentBatchUrls([])
+    setCurrentBatchCompleted([])
+  }, [setIsProcessing, setCurrentProcessingUrl, setQueue, setCurrentBatchUrls, setCurrentBatchCompleted])
+
+  const startProcessing = useCallback(() => {
+    if (queue.length > 0 && !isProcessing) {
+      processQueueItems()
+    }
+  }, [queue.length, isProcessing, processQueueItems])
+
+  // Auto-start processing when queue has items (but only if not already processing)
+  useEffect(() => {
+    startProcessing()
+  }, [startProcessing])
 
   useEffect(() => {
-    if (queue.length > 0 && !isProcessing && !processingRef.current) {
-      processQueue()
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
-  }, [queue, isProcessing, processQueue])
+  }, [])
 
-  const queueStatus = {
+  const queueStatus = useMemo(() => ({
     pending: queue.length,
     currentUrl: currentProcessingUrl,
     isProcessing,
     totalCompleted: currentBatchCompleted.length,
     recentlyCompleted: currentBatchCompleted
       .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
-      .slice(0, 10) // Show last 10 completed from current batch
-  }
+      .slice(0, 10),
+    progress: queueProgress,
+  }), [queue.length, currentProcessingUrl, isProcessing, currentBatchCompleted, queueProgress])
 
   return {
     queue,
     queueStatus,
     addToQueue,
-    removeFromQueue,
-    clearQueue,
-    processQueue,
+    processQueue: processQueueItems,
+    cancelProcessing,
+    startProcessing,
   }
 }

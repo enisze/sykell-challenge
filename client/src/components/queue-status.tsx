@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
-import { queueStatusOpenAtom, useUrlQueue } from "@/hooks/useUrlQueue"
+import { useUrlQueue } from "@/hooks/useUrlQueue"
 import { URLStatus } from "@/types/url-analysis"
-import { useAtom } from "jotai"
-import { AlertCircle, CheckCircle, Clock, List, Loader2, Minimize2, X } from "lucide-react"
+import { AlertCircle, CheckCircle, Clock, List, Loader2, Minimize2, StopCircle, X } from "lucide-react"
 import { useState } from "react"
+import { toast } from "sonner"
 
   const getStatusDisplay = (status: URLStatus) => {
     switch (status) {
@@ -25,12 +25,21 @@ import { useState } from "react"
   }
 
 export function QueueStatusComponent() {
-  const { queue, queueStatus, removeFromQueue } = useUrlQueue()
+  const { queue, queueStatus, cancelProcessing } = useUrlQueue()
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isQueueStatusOpen, setIsQueueStatusOpen] = useAtom(queueStatusOpenAtom)
+  const [isQueueStatusOpen, setIsQueueStatusOpen] = useState(true)
 
+  const handleCancelProcessing = () => {
+    cancelProcessing()
+    toast.info("Processing cancelled", {
+      description: "All pending URL analyses have been stopped and cleared."
+    })
+  }
+
+  const shouldShow = queue.length > 0 || queueStatus.isProcessing || queueStatus.recentlyCompleted.length > 0
+  
   // Don't show the component if there's nothing to display or if user closed it
-  if (!isQueueStatusOpen || (queue.length === 0 && !queueStatus.isProcessing && queueStatus.recentlyCompleted.length === 0)) {
+  if (!shouldShow || !isQueueStatusOpen) {
     return null
   }
 
@@ -49,6 +58,17 @@ export function QueueStatusComponent() {
               Queue Status
             </CardTitle>
             <div className="flex items-center gap-1">
+              {queueStatus.isProcessing && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleCancelProcessing}
+                  className="h-6 w-6 p-0"
+                  title="Cancel Processing"
+                >
+                  <StopCircle className="h-3 w-3" />
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -129,9 +149,20 @@ export function QueueStatusComponent() {
       <CardContent className="space-y-4 overflow-y-auto max-h-80">
         {queueStatus.isProcessing && queueStatus.currentUrl && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <span className="text-sm font-medium">Currently Processing</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                <span className="text-sm font-medium">Currently Processing</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCancelProcessing}
+                className="h-6 text-xs px-2"
+              >
+                <StopCircle className="h-3 w-3 mr-1" />
+                Cancel
+              </Button>
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
@@ -157,20 +188,9 @@ export function QueueStatusComponent() {
                 {queue.map((url, index) => (
                   <div key={index} className="flex items-center justify-between bg-yellow-50 dark:bg-yellow-900/20 rounded p-2">
                     <span className="text-sm truncate flex-1">{url}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-yellow-500">
-                        #{index + 1}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => removeFromQueue(url)}
-                        disabled={queueStatus.isProcessing}
-                        className="h-6 w-6 p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <Badge variant="outline" className="text-yellow-500">
+                      #{index + 1}
+                    </Badge>
                   </div>
                 ))}
               </div>

@@ -1,10 +1,6 @@
-export type URLStatus = "queued" | "running" | "done" | "error" | "stopped"
+import type { BrokenLink } from '@/lib/api'
 
-export interface BrokenLink {
-  url: string
-  statusCode: number
-  error?: string
-}
+export type URLStatus = "queued" | "running" | "done" | "error" | "stopped"
 
 export interface URLEntry {
   id: string
