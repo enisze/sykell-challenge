@@ -1,7 +1,11 @@
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { urlTableColumns } from "@/components/url-table-columns"
+import { useUrlQueue } from "@/hooks/useUrlQueue"
+import { deleteUrlsAtom, rerunUrlsWithQueueAtom } from "@/store/urlStore"
 import type { URLEntry } from "@/types/url-analysis"
 import {
   type Column,
@@ -11,15 +15,19 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type RowSelectionState,
   type SortingState,
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
 import { useDebounce } from "@uidotdev/usehooks"
+import { useAtom } from "jotai"
 import {
   ChevronDown,
   ChevronUp,
-  Search
+  RefreshCw,
+  Search,
+  Trash2
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { DataTablePagination } from "./data-table-pagination"
@@ -129,7 +137,12 @@ export function URLTable({ data, isLoading }: URLTableProps) {
   ])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [globalFilter, setGlobalFilter] = useState("")
+
+  const [, deleteUrls] = useAtom(deleteUrlsAtom)
+  const [, rerunUrlsWithQueue] = useAtom(rerunUrlsWithQueueAtom)
+  const { addToQueue } = useUrlQueue()
 
   const table = useReactTable({
     data,
@@ -142,11 +155,15 @@ export function URLTable({ data, isLoading }: URLTableProps) {
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
+    getRowId: (row) => row.id,
     globalFilterFn: "includesString",
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      rowSelection,
       globalFilter,
     },
     initialState: {
@@ -155,6 +172,23 @@ export function URLTable({ data, isLoading }: URLTableProps) {
       },
     },
   })
+
+  const selectedRowIds = Object.keys(rowSelection).filter(key => rowSelection[key])
+  const selectedCount = selectedRowIds.length
+
+  const handleDeleteSelected = () => {
+    if (selectedRowIds.length > 0) {
+      deleteUrls(selectedRowIds)
+      setRowSelection({})
+    }
+  }
+
+  const handleRerunSelected = () => {
+    if (selectedRowIds.length > 0) {
+      rerunUrlsWithQueue({ urlIds: selectedRowIds, addToQueue })
+      setRowSelection({})
+    }
+  }
 
   if (isLoading) {
     return (
@@ -166,6 +200,55 @@ export function URLTable({ data, isLoading }: URLTableProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+        <span className="text-sm font-medium">
+          {selectedCount > 0 
+            ? `${selectedCount} row${selectedCount > 1 ? 's' : ''} selected`
+            : 'Select rows to perform bulk actions'
+          }
+        </span>
+        <div className="flex gap-2 ml-auto">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={selectedCount === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {selectedCount === 0 
+                ? 'Select rows to delete them' 
+                : `Delete ${selectedCount} selected row${selectedCount > 1 ? 's' : ''}`
+              }
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRerunSelected}
+                disabled={selectedCount === 0}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Rerun Analysis
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {selectedCount === 0 
+                ? 'Select rows to rerun their analysis' 
+                : `Rerun analysis for ${selectedCount} selected row${selectedCount > 1 ? 's' : ''}`
+              }
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">

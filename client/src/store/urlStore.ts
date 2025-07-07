@@ -1,15 +1,12 @@
-import type { URLEntry } from '@/types/url-analysis'
+import type { URLEntry, URLStatus } from '@/types/url-analysis'
 import { atom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 
 
-// URL storage atom with local storage persistence
 export const urlsAtom = atomWithStorage<URLEntry[]>('urls', [])
 
-// Loading state atom
 export const isLoadingAtom = atom(false)
 
-// Add URL to store
 export const addUrlAtom = atom(
   null,
   (get, set, newUrl: URLEntry) => {
@@ -18,7 +15,6 @@ export const addUrlAtom = atom(
   }
 )
 
-// Update URL in store
 export const updateUrlAtom = atom(
   null,
   (get, set, updatedUrl: URLEntry) => {
@@ -30,7 +26,34 @@ export const updateUrlAtom = atom(
   }
 )
 
-// Generate unique ID
+export const deleteUrlsAtom = atom(
+  null,
+  (get, set, urlIds: string[]) => {
+    const currentUrls = get(urlsAtom)
+    const filteredUrls = currentUrls.filter(url => !urlIds.includes(url.id))
+    set(urlsAtom, filteredUrls)
+  }
+)
+
+
+export const rerunUrlsWithQueueAtom = atom(
+  null,
+  (get, set, { urlIds, addToQueue }: { urlIds: string[], addToQueue: (urls: string[]) => void }) => {
+    const currentUrls = get(urlsAtom)
+    const urlsToRerun = currentUrls.filter(url => urlIds.includes(url.id))
+    
+    const updatedUrls = currentUrls.map(url => 
+      urlIds.includes(url.id) 
+        ? { ...url, status: "queued" as URLStatus, lastUpdated: new Date() }
+        : url
+    )
+    set(urlsAtom, updatedUrls)
+    
+    const urlsToAdd = urlsToRerun.map(url => url.url)
+    addToQueue(urlsToAdd)
+  }
+)
+
 export const generateId = () => {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9)
 }
