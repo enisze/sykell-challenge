@@ -64,31 +64,29 @@ export function useUrlQueue() {
           'Content-Type': 'application/json',
           'X-API-Key': 'your-secret-api-key',
         },
-        body: JSON.stringify({ urls: [url] }),
+        body: JSON.stringify({ url: url }),
       })
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
+       const result = await response.json()
       
-      const result = await response.json()
-      const analysisResult = result.results?.[0]
-      
-      if (!analysisResult) {
-        throw new Error("No analysis result returned")
+      if (result.error) {
+        throw new Error(result.error)
       }
-      
+
       const completedEntry: URLEntry = {
         ...newUrlEntry,
-        title: analysisResult.pageTitle || "Analysis Complete",
-        htmlVersion: analysisResult.htmlVersion || "HTML5",
-        internalLinks: analysisResult.internalLinks || 0,
-        externalLinks: analysisResult.externalLinks || 0,
+        title: result.pageTitle || "Analysis Complete",
+        htmlVersion: result.htmlVersion || "HTML5",
+        internalLinks: result.internalLinks || 0,
+        externalLinks: result.externalLinks || 0,
         brokenLinks: 0,
-        status: analysisResult.error ? "error" : "done" as URLStatus,
+        status: result.error ? "error" : "done" as URLStatus,
         lastUpdated: new Date(),
         processingTime: 0,
-        errorMessage: analysisResult.error,
+        errorMessage: result.error,
       }
       
       updateUrl(completedEntry)
