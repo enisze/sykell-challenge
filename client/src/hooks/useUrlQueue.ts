@@ -85,6 +85,8 @@ export function useUrlQueue() {
 
 			isCancelledRef.current = false
 			setIsCancelled(false)
+			
+			processingUrlsRef.current.clear()
 		},
 		[setQueue, setCurrentBatchUrls, setCurrentBatchCompleted, setIsCancelled],
 	)
@@ -144,7 +146,7 @@ export function useUrlQueue() {
 	)
 
 	const processQueueItems = useCallback(async () => {
-		if (isProcessingRef.current || shouldCancel()) {
+		if (isProcessingRef.current) {
 			return
 		}
 
@@ -207,6 +209,8 @@ export function useUrlQueue() {
 		setIsCancelled(true)
 
 		processingUrlsRef.current.clear()
+		isProcessingRef.current = false
+		
 		cleanupQueuedUrls(currentBatchUrls)
 
 		setIsProcessing(false)
@@ -214,7 +218,6 @@ export function useUrlQueue() {
 		setQueue([])
 		setCurrentBatchUrls([])
 		setCurrentBatchCompleted([])
-		isProcessingRef.current = false
 
 		return Promise.resolve()
 	}, [
@@ -233,11 +236,15 @@ export function useUrlQueue() {
 		isCancelledRef.current = false
 		setIsCancelled(false)
 
-		setTimeout(() => {
-			if (!isProcessingRef.current) {
-				processQueueItems()
-			}
-		}, 10)
+		processingUrlsRef.current.clear()
+
+		processQueueItems()
+
+		// setTimeout(() => {
+		// 	if (!isProcessingRef.current) {
+		// 		processQueueItems()
+		// 	}
+		// }, 50)
 	}, [processQueueItems, setIsCancelled])
 
 	useEffect(() => {

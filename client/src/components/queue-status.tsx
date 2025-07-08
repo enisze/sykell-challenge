@@ -18,6 +18,7 @@ import {
 	List,
 	Loader2,
 	Minimize2,
+	Play,
 	StopCircle,
 	X,
 } from 'lucide-react'
@@ -40,7 +41,7 @@ const getStatusDisplay = (status: URLStatus) => {
 }
 
 export function QueueStatusComponent() {
-	const { queue, queueStatus, cancelProcessing } = useUrlQueue()
+	const { queue, queueStatus, cancelProcessing, startProcessing } = useUrlQueue()
 	const [isCollapsed, setIsCollapsed] = useState(false)
 	const [isQueueStatusOpen, setIsQueueStatusOpen] = useState(true)
 
@@ -55,6 +56,15 @@ export function QueueStatusComponent() {
 		toast.info('Processing cancelled', {
 			description: 'All pending URL analyses have been stopped and cleared.',
 		})
+	}
+
+	const handleRestartProcessing = () => {
+		if (queue.length > 0) {
+			startProcessing()
+			toast.info('Processing restarted', {
+				description: 'Queue processing has been restarted.',
+			})
+		}
 	}
 
 	const shouldShow =
@@ -211,11 +221,24 @@ export function QueueStatusComponent() {
 					<>
 						{queueStatus.isProcessing && <Separator />}
 						<div className="space-y-2">
-							<div className="flex items-center gap-2">
-								<Clock className="h-4 w-4 text-yellow-500" />
-								<span className="text-sm font-medium">
-									Queue ({queue.length})
-								</span>
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<Clock className="h-4 w-4 text-yellow-500" />
+									<span className="text-sm font-medium">
+										Queue ({queue.length})
+									</span>
+								</div>
+								{!queueStatus.isProcessing && (
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={handleRestartProcessing}
+										className="h-6 text-xs px-2"
+									>
+										<Play className="h-3 w-3 mr-1" />
+										Start
+									</Button>
+								)}
 							</div>
 							<div className="space-y-2 max-h-32 overflow-y-auto">
 								{queue.map((url, index) => (
