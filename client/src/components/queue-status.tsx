@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { useUrlQueue } from "@/hooks/useUrlQueue"
 import { URLStatus } from "@/types/url-analysis"
 import { AlertCircle, CheckCircle, Clock, List, Loader2, Minimize2, StopCircle, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
   const getStatusDisplay = (status: URLStatus) => {
@@ -28,6 +28,12 @@ export function QueueStatusComponent() {
   const { queue, queueStatus, cancelProcessing } = useUrlQueue()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isQueueStatusOpen, setIsQueueStatusOpen] = useState(true)
+
+  useEffect(() => {
+    if (queueStatus.isProcessing && !isQueueStatusOpen) {
+      setIsQueueStatusOpen(true)
+    }
+  }, [queueStatus.isProcessing, isQueueStatusOpen])
 
   const handleCancelProcessing = () => {
     cancelProcessing()
