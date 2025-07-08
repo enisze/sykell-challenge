@@ -57,7 +57,6 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={onBack}>
@@ -76,7 +75,6 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
         </Badge>
       </div>
 
-      {/* Basic Info Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -133,9 +131,7 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
         </CardContent>
       </Card>
 
-      {/* Links Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -172,7 +168,6 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
           </CardContent>
         </Card>
 
-        {/* Bar Chart Alternative */}
         <Card>
           <CardHeader>
             <CardTitle>Link Statistics</CardTitle>
@@ -196,7 +191,6 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
         </Card>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -244,29 +238,16 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
         </Card>
       </div>
 
-      {/* Broken Links Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <X className="h-5 w-5 text-red-600" />
             Broken Links Analysis
           </CardTitle>
-          <CardDescription>
-            Status of link validation on this page
-          </CardDescription>
         </CardHeader>
         <CardContent>
           {urlEntry.brokenLinks > 0 ? (
             <div className="space-y-4">
-              <div className="text-center py-4">
-                <X className="h-12 w-12 text-red-600 mx-auto mb-4" />
-                <p className="text-lg font-medium text-red-600">
-                  {urlEntry.brokenLinks} Broken Link{urlEntry.brokenLinks > 1 ? 's' : ''} Detected
-                </p>
-                <p className="text-muted-foreground mt-2">
-                  The analysis found {urlEntry.brokenLinks} non-functional link{urlEntry.brokenLinks > 1 ? 's' : ''} on this page.
-                </p>
-              </div>
               
               {urlEntry.brokenLinkDetails && urlEntry.brokenLinkDetails.length > 0 && (
                 <div className="space-y-3">
