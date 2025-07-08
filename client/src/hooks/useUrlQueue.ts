@@ -111,7 +111,8 @@ export function useUrlQueue() {
       const urlsToProcess = [...queue]
       
       for (const url of urlsToProcess) {
-        if (!isProcessing) break
+        // Check if processing was cancelled via abort controller
+        if (abortControllerRef.current?.signal.aborted) break
         
         setCurrentProcessingUrl(url)
         await analyzeUrlWithProcessing(url)
@@ -142,7 +143,7 @@ export function useUrlQueue() {
     if (queue.length > 0 && !isProcessing) {
       processQueueItems()
     }
-  }, [queue.length, isProcessing, processQueueItems])
+  }, [queue, isProcessing, processQueueItems])
 
   // Auto-start processing when queue has items (but only if not already processing)
   useEffect(() => {
