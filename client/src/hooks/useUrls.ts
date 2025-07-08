@@ -3,11 +3,11 @@ import { useAtom } from 'jotai'
 
 // Hook to get all URLs from Jotai store
 export function useUrls() {
-  const [urls] = useAtom(urlsAtom)
-  const [isLoading] = useAtom(isLoadingAtom)
-  
-  return {
-    data: urls,
-    isLoading,
-  }
+	const [urls] = useAtom(urlsAtom)
+	const [isLoading] = useAtom(isLoadingAtom)
+
+	return {
+		data: urls,
+		isLoading,
+	}
 }
