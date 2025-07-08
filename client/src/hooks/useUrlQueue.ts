@@ -1,5 +1,9 @@
 import { analyzeUrl } from '@/lib/api'
-import { processUrlAtom } from '@/store/urlStore'
+import {
+	cleanupQueuedUrlsAtom,
+	isCancelledAtom,
+	processUrlAtom,
+} from '@/store/urlStore'
 import type { URLEntry } from '@/types/url-analysis'
 import { atom, useAtom, useSetAtom } from 'jotai'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
@@ -11,170 +15,272 @@ export const currentBatchUrlsAtom = atom<string[]>([])
 export const currentBatchCompletedAtom = atom<URLEntry[]>([])
 
 export const queueProgressAtom = atom((get) => {
-  const currentBatchUrls = get(currentBatchUrlsAtom)
-  const currentBatchCompleted = get(currentBatchCompletedAtom)
-  
-  return currentBatchUrls.length > 0 ? (currentBatchCompleted.length / currentBatchUrls.length) * 100 : 0
+	const currentBatchUrls = get(currentBatchUrlsAtom)
+	const currentBatchCompleted = get(currentBatchCompletedAtom)
+
+	return currentBatchUrls.length > 0
+		? (currentBatchCompleted.length / currentBatchUrls.length) * 100
+		: 0
 })
 
-// Constants
-const PROCESSING_DELAY = 1000 // Increased to 1 second for better rate limiting
+const PROCESSING_DELAY = 1000
+const CANCELLATION_CHECK_INTERVAL = 50
 
 /**
  * URL queue management hook with batch processing
- * 
- * @returns Queue management functions and status
  */
 export function useUrlQueue() {
-  const [queue, setQueue] = useAtom(queueAtom)
-  const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom)
-  const [currentProcessingUrl, setCurrentProcessingUrl] = useAtom(currentProcessingUrlAtom)
-  const [currentBatchUrls, setCurrentBatchUrls] = useAtom(currentBatchUrlsAtom)
-  const [currentBatchCompleted, setCurrentBatchCompleted] = useAtom(currentBatchCompletedAtom)
-  const processUrl = useSetAtom(processUrlAtom)
-  const queueProgress = useAtom(queueProgressAtom)[0]
-  
-  const abortControllerRef = useRef<AbortController | null>(null)
+	const [queue, setQueue] = useAtom(queueAtom)
+	const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom)
+	const [currentProcessingUrl, setCurrentProcessingUrl] = useAtom(
+		currentProcessingUrlAtom,
+	)
+	const [currentBatchUrls, setCurrentBatchUrls] = useAtom(currentBatchUrlsAtom)
+	const [currentBatchCompleted, setCurrentBatchCompleted] = useAtom(
+		currentBatchCompletedAtom,
+	)
+	const [isCancelled, setIsCancelled] = useAtom(isCancelledAtom)
+	const queueProgress = useAtom(queueProgressAtom)[0]
 
-  const updateBatchCompleted = useCallback((url: string, entry: URLEntry) => {
-    if (!currentBatchUrls.includes(url)) return
-    
-    setCurrentBatchCompleted(prev => {
-      const existingIndex = prev.findIndex(e => e.url === url)
-      if (existingIndex >= 0) {
-        const newArray = [...prev]
-        newArray[existingIndex] = entry
-        return newArray
-      }
-      return [...prev, entry]
-    })
-  }, [currentBatchUrls, setCurrentBatchCompleted])
+	const processUrl = useSetAtom(processUrlAtom)
+	const cleanupQueuedUrls = useSetAtom(cleanupQueuedUrlsAtom)
 
-  const addToQueue = useCallback((urlsToAdd: string[]) => {
-    const uniqueUrls = [...new Set(urlsToAdd)]
-    
-    setQueue(prev => {
-      const existingUrls = new Set(prev)
-      const newUrls = uniqueUrls.filter(url => !existingUrls.has(url))
-      return newUrls.length > 0 ? [...prev, ...newUrls] : prev
-    })
-    
-    setCurrentBatchUrls(uniqueUrls)
-    setCurrentBatchCompleted([])
-  }, [setQueue, setCurrentBatchUrls, setCurrentBatchCompleted])
+	const isCancelledRef = useRef(false)
+	const isProcessingRef = useRef(false)
+	const processingUrlsRef = useRef<Set<string>>(new Set())
 
-  const analyzeUrlWithProcessing = useCallback(async (url: string) => {
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    
-    try {
-      // Step 1: Create URL entry with "queued" status
-      processUrl({ url, status: "queued" })
-      
-      // Step 2: Update to "running" status
-      processUrl({ url })
-      
-      // Step 3: Make API request
-      const result = await analyzeUrl(url, controller.signal)
-      
-      // Step 4: Update to "done" status with results
-      const completedEntry = processUrl({ url, apiResult: result })
-      updateBatchCompleted(url, completedEntry)
-      
-    } catch (error) {
-      // Handle cancellation gracefully
-      if (error instanceof Error && error.name === 'AbortError') {
-        return
-      }
-      
-      // Step 5: Update to "error" status
-      const errorEntry = processUrl({ 
-        url, 
-        error: error instanceof Error ? error.message : "Unknown error occurred" 
-      })
-      updateBatchCompleted(url, errorEntry)
-    } finally {
-      // Clean up abort controller
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null
-      }
-    }
-  }, [processUrl, updateBatchCompleted])
+	const shouldCancel = useCallback(() => {
+		return isCancelledRef.current || isCancelled
+	}, [isCancelled])
 
-  const processQueueItems = useCallback(async () => {
-    // Use isProcessing state instead of ref to prevent race conditions
-    if (isProcessing || queue.length === 0) return
+	const updateBatchCompleted = useCallback(
+		(url: string, entry: URLEntry) => {
+			if (shouldCancel() || !currentBatchUrls.includes(url)) return
 
-    setIsProcessing(true)
+			setCurrentBatchCompleted((prev) => {
+				const existingIndex = prev.findIndex((e) => e.url === url)
+				if (existingIndex >= 0) {
+					const updated = [...prev]
+					updated[existingIndex] = entry
+					return updated
+				}
+				return [...prev, entry]
+			})
+		},
+		[currentBatchUrls, setCurrentBatchCompleted, shouldCancel],
+	)
 
-    try {
-      const urlsToProcess = [...queue]
-      
-      for (const url of urlsToProcess) {
-        // Check if processing was cancelled via abort controller
-        if (abortControllerRef.current?.signal.aborted) break
-        
-        setCurrentProcessingUrl(url)
-        await analyzeUrlWithProcessing(url)
-        setQueue(prev => prev.filter(u => u !== url))
-        
-        if (urlsToProcess.indexOf(url) < urlsToProcess.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, PROCESSING_DELAY))
-        }
-      }
-    } finally {
-      setIsProcessing(false)
-      setCurrentProcessingUrl(null)
-    }
-  }, [queue, isProcessing, analyzeUrlWithProcessing, setIsProcessing, setCurrentProcessingUrl, setQueue])
+	const addToQueue = useCallback(
+		(urlsToAdd: string[]) => {
+			const uniqueUrls = [...new Set(urlsToAdd)]
 
-  const cancelProcessing = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    setIsProcessing(false)
-    setCurrentProcessingUrl(null)
-    setQueue([])
-    setCurrentBatchUrls([])
-    setCurrentBatchCompleted([])
-  }, [setIsProcessing, setCurrentProcessingUrl, setQueue, setCurrentBatchUrls, setCurrentBatchCompleted])
+			setQueue((prev) => {
+				const existingUrls = new Set(prev)
+				const newUrls = uniqueUrls.filter((url) => !existingUrls.has(url))
+				return newUrls.length > 0 ? [...prev, ...newUrls] : prev
+			})
 
-  const startProcessing = useCallback(() => {
-    if (queue.length > 0 && !isProcessing) {
-      processQueueItems()
-    }
-  }, [queue, isProcessing, processQueueItems])
+			setCurrentBatchUrls(uniqueUrls)
+			setCurrentBatchCompleted([])
 
-  // Auto-start processing when queue has items (but only if not already processing)
-  useEffect(() => {
-    startProcessing()
-  }, [startProcessing])
+			isCancelledRef.current = false
+			setIsCancelled(false)
+		},
+		[setQueue, setCurrentBatchUrls, setCurrentBatchCompleted, setIsCancelled],
+	)
 
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-    }
-  }, [])
+	const analyzeUrlWithProcessing = useCallback(
+		async (url: string) => {
+			if (shouldCancel() || processingUrlsRef.current.has(url)) {
+				return
+			}
 
-  const queueStatus = useMemo(() => ({
-    pending: queue.length,
-    currentUrl: currentProcessingUrl,
-    isProcessing,
-    totalCompleted: currentBatchCompleted.length,
-    recentlyCompleted: currentBatchCompleted
-      .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
-      .slice(0, 10),
-    progress: queueProgress,
-  }), [queue.length, currentProcessingUrl, isProcessing, currentBatchCompleted, queueProgress])
+			processingUrlsRef.current.add(url)
 
-  return {
-    queue,
-    queueStatus,
-    addToQueue,
-    processQueue: processQueueItems,
-    cancelProcessing,
-    startProcessing,
-  }
+			try {
+				// Step 1: Queue status
+				const result = processUrl({ url, status: 'queued' })
+				if (!result) {
+					// processUrl returned null, meaning we're cancelled
+					return
+				}
+
+				// Step 2: Running status
+				const runningResult = processUrl({ url })
+				if (!runningResult) {
+					// processUrl returned null, meaning we're cancelled
+					return
+				}
+
+				// Step 3: API call with cancellation race
+				const apiResult = await analyzeUrl(url)
+
+				const entry = processUrl({
+					url,
+					apiResult,
+				})
+				if (entry) {
+					updateBatchCompleted(url, entry)
+				}
+			} catch (error) {
+				if (error instanceof Error && error.name === 'AbortError') {
+					return // Cancellation is expected
+				}
+
+				if (!shouldCancel()) {
+					const entry = processUrl({
+						url,
+						error: error instanceof Error ? error.message : 'Unknown error',
+					})
+					if (entry) {
+						updateBatchCompleted(url, entry)
+					}
+				}
+			} finally {
+				processingUrlsRef.current.delete(url)
+			}
+		},
+		[processUrl, updateBatchCompleted, shouldCancel],
+	)
+
+	const processQueueItems = useCallback(async () => {
+		if (isProcessingRef.current || shouldCancel()) {
+			return
+		}
+
+		isProcessingRef.current = true
+		setIsProcessing(true)
+
+		try {
+			// Get current queue state inside the function
+			let currentQueue: string[] = []
+			setQueue((prev) => {
+				currentQueue = [...prev]
+				return prev
+			})
+
+			if (currentQueue.length === 0) {
+				return
+			}
+
+			for (let i = 0; i < currentQueue.length; i++) {
+				if (shouldCancel()) break
+
+				const url = currentQueue[i]
+				setCurrentProcessingUrl(url)
+
+				await analyzeUrlWithProcessing(url)
+
+				setQueue((prev) => prev.filter((u) => u !== url))
+
+				// Add delay between requests with cancellation checks
+				if (i < currentQueue.length - 1) {
+					for (
+						let elapsed = 0;
+						elapsed < PROCESSING_DELAY;
+						elapsed += CANCELLATION_CHECK_INTERVAL
+					) {
+						await new Promise((resolve) =>
+							setTimeout(resolve, CANCELLATION_CHECK_INTERVAL),
+						)
+					}
+				}
+			}
+		} catch (error) {
+			console.error('Queue processing error:', error)
+		} finally {
+			isProcessingRef.current = false
+			setIsProcessing(false)
+			setCurrentProcessingUrl(null)
+		}
+	}, [
+		shouldCancel,
+		analyzeUrlWithProcessing,
+		setIsProcessing,
+		setCurrentProcessingUrl,
+		setQueue,
+		setIsCancelled,
+	])
+
+	const cancelProcessing = useCallback(() => {
+		isCancelledRef.current = true
+		setIsCancelled(true)
+
+		processingUrlsRef.current.clear()
+		cleanupQueuedUrls(currentBatchUrls)
+
+		setIsProcessing(false)
+		setCurrentProcessingUrl(null)
+		setQueue([])
+		setCurrentBatchUrls([])
+		setCurrentBatchCompleted([])
+		isProcessingRef.current = false
+
+		return Promise.resolve()
+	}, [
+		setIsCancelled,
+		setIsProcessing,
+		setCurrentProcessingUrl,
+		setQueue,
+		setCurrentBatchUrls,
+		setCurrentBatchCompleted,
+		cleanupQueuedUrls,
+		currentBatchUrls,
+	])
+
+	const startProcessing = useCallback(() => {
+		// Reset cancellation state
+		isCancelledRef.current = false
+		setIsCancelled(false)
+
+		setTimeout(() => {
+			if (!isProcessingRef.current) {
+				processQueueItems()
+			}
+		}, 10)
+	}, [processQueueItems, setIsCancelled])
+
+	useEffect(() => {
+		return () => {
+			isCancelledRef.current = true
+			processingUrlsRef.current.clear()
+			isProcessingRef.current = false
+		}
+	}, [])
+
+	const queueStatus = useMemo(
+		() => ({
+			pending: queue.length,
+			currentUrl: currentProcessingUrl,
+			isProcessing,
+			totalCompleted: currentBatchCompleted.length,
+			recentlyCompleted: isCancelled
+				? []
+				: currentBatchCompleted
+						.sort(
+							(a, b) =>
+								new Date(b.lastUpdated).getTime() -
+								new Date(a.lastUpdated).getTime(),
+						)
+						.slice(0, 10),
+			progress: queueProgress,
+		}),
+		[
+			queue.length,
+			currentProcessingUrl,
+			isProcessing,
+			currentBatchCompleted,
+			queueProgress,
+			isCancelled,
+		],
+	)
+
+	return {
+		queue,
+		queueStatus,
+		addToQueue,
+		processQueue: processQueueItems,
+		cancelProcessing,
+		startProcessing,
+	}
 }
