@@ -39,7 +39,7 @@ import {
 	type VisibilityState,
 } from '@tanstack/react-table'
 import { useDebounce } from '@uidotdev/usehooks'
-import { useAtom } from 'jotai'
+import { useSetAtom } from 'jotai'
 import { ChevronDown, ChevronUp, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { DataTablePagination } from './data-table-pagination'
@@ -159,8 +159,8 @@ export function URLTable({ data, isLoading }: URLTableProps) {
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 	const [globalFilter, setGlobalFilter] = useState('')
 
-	const [, deleteUrls] = useAtom(deleteUrlsAtom)
-	const [, rerunUrlsWithQueue] = useAtom(rerunUrlsWithQueueAtom)
+	const deleteUrls = useSetAtom(deleteUrlsAtom)
+	const rerunUrlsWithQueue= useSetAtom(rerunUrlsWithQueueAtom)
 	const { addToQueue, startProcessing } = useUrlQueue()
 
 	const table = useReactTable({
@@ -223,13 +223,13 @@ export function URLTable({ data, isLoading }: URLTableProps) {
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-				<span className="text-sm font-medium">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2 p-3 bg-muted rounded-lg">
+				<span className="text-sm font-medium text-center sm:text-left">
 					{selectedCount > 0
 						? `${selectedCount} row${selectedCount > 1 ? 's' : ''} selected`
 						: 'Select rows to perform bulk actions'}
 				</span>
-				<div className="flex gap-2 ml-auto">
+				<div className="flex flex-col gap-2 sm:flex-row sm:gap-2 sm:ml-auto">
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button
@@ -237,6 +237,7 @@ export function URLTable({ data, isLoading }: URLTableProps) {
 								size="sm"
 								onClick={handleDeleteSelected}
 								disabled={selectedCount === 0}
+								className="w-full sm:w-auto text-xs sm:text-sm"
 							>
 								<Trash2 className="h-4 w-4 mr-2" />
 								Delete Selected
@@ -255,6 +256,7 @@ export function URLTable({ data, isLoading }: URLTableProps) {
 								size="sm"
 								onClick={handleRerunSelected}
 								disabled={selectedCount === 0}
+								className="w-full sm:w-auto text-xs sm:text-sm"
 							>
 								<RefreshCw className="h-4 w-4 mr-2" />
 								Rerun Analysis

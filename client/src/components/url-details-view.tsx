@@ -11,11 +11,10 @@ import type { URLEntry } from '@/types/url-analysis'
 import {
 	ArrowLeft,
 	Calendar,
-	Clock,
 	ExternalLink,
 	Globe,
 	Link,
-	X,
+	X
 } from 'lucide-react'
 import {
 	Bar,
@@ -81,11 +80,12 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
 		}
 	}
 
+
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center gap-4">
-					<Button variant="ghost" size="sm" onClick={onBack}>
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+					<Button variant="ghost" size="sm" onClick={onBack} className="self-start">
 						<ArrowLeft className="h-4 w-4 mr-2" />
 						Back to Table
 					</Button>
@@ -96,7 +96,7 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
 						</p>
 					</div>
 				</div>
-				<Badge className={getStatusColor(urlEntry.status)}>
+				<Badge className={`${getStatusColor(urlEntry.status)} self-start sm:self-center`}>
 					{urlEntry.status}
 				</Badge>
 			</div>
@@ -151,17 +151,6 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
 							</div>
 						</div>
 					</div>
-					{urlEntry.processingTime && (
-						<div>
-							<label className="text-sm font-medium text-muted-foreground">
-								Processing Time
-							</label>
-							<div className="flex items-center gap-2 mt-1">
-								<Clock className="h-4 w-4 text-muted-foreground" />
-								<span>{urlEntry.processingTime}ms</span>
-							</div>
-						</div>
-					)}
 					{urlEntry.errorMessage && (
 						<div>
 							<label className="text-sm font-medium text-muted-foreground">
@@ -185,18 +174,16 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<div className="h-64">
+						<div className="h-80">
 							<ResponsiveContainer width="100%" height="100%">
 								<PieChart>
 									<Pie
 										data={linkData}
 										cx="50%"
-										cy="50%"
+										cy="40%"
 										labelLine={false}
-										label={({ name, value, percent }) =>
-											`${name}: ${value} (${((percent || 0) * 100).toFixed(0)}%)`
-										}
-										outerRadius={80}
+										label={({ percent }) => `${((percent || 0) * 100).toFixed(0)}%`}
+										outerRadius={70}
 										fill="#8884d8"
 										dataKey="value"
 									>
@@ -204,8 +191,20 @@ export function URLDetailsView({ urlEntry, onBack }: URLDetailsViewProps) {
 											<Cell key={`cell-${index}`} fill={entry.color} />
 										))}
 									</Pie>
-									<Tooltip />
-									<Legend />
+									<Tooltip 
+										formatter={(value, name) => [
+											`${value} (${(((value as number) / totalLinks) * 100).toFixed(0)}%)`,
+											name
+										]}
+									/>
+									<Legend 
+										verticalAlign="bottom" 
+										height={40}
+										iconType="circle"
+										wrapperStyle={{
+											bottom: '15%'
+										 }}
+									/>
 								</PieChart>
 							</ResponsiveContainer>
 						</div>

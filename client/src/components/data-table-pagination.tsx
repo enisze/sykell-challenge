@@ -130,7 +130,7 @@ export function DataTablePagination<TData>({
 
 	return (
 		<div className="flex flex-col space-y-4 px-2">
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
 				<div className="flex items-center space-x-2">
 					<p className="text-sm font-medium">Rows per page</p>
 					<Select
@@ -152,7 +152,7 @@ export function DataTablePagination<TData>({
 					</Select>
 				</div>
 
-				<div className="flex items-center space-x-2">
+				<div className="flex items-center justify-center sm:justify-end space-x-2">
 					<div className="text-sm font-medium">
 						Page {currentPage} of {totalPages}
 					</div>
@@ -161,7 +161,7 @@ export function DataTablePagination<TData>({
 
 			<div className="flex justify-center">
 				<Pagination>
-					<PaginationContent>
+					<PaginationContent className="flex-wrap justify-center">
 						<PaginationItem>
 							<PaginationPrevious
 								href="#"
@@ -177,7 +177,9 @@ export function DataTablePagination<TData>({
 							/>
 						</PaginationItem>
 
-						{renderPageNumbers()}
+						<div className="hidden sm:contents">
+							{renderPageNumbers()}
+						</div>
 
 						<PaginationItem>
 							<PaginationNext
